@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import NavButton from './components/NavButton';
+import NavButton from './Components/NavButton';
 import { currentCoinState } from './engine/coinEngine';
 
 function formatUSD(n) {
