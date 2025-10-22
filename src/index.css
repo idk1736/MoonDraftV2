@@ -1,0 +1,16 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom color variables */
+:root {
+  --md-violet: #6D28D9;
+  --md-cyan: #06B6D4;
+}
+
+body {
+  font-family: 'Inter', sans-serif;
+  background: linear-gradient(180deg, #071032 0%, #031428 100%);
+  margin: 0;
+  padding: 0;
+}
