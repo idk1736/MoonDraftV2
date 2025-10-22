@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import Header from './components/Header';
+import Header from './Components/Header';
 import { currentCoinState } from './engine/coinEngine';
 
 // Mini SVG line chart for per-token page
