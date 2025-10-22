@@ -1,27 +1,28 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import Header from './Components/Header';
-import CoinCard from './Components/CoinCard';
-import Portfolio from './Components/Portfolio';
-import TradeModal from './Components/TradeModal';
-import ComingSoon from './Components/ComingSoon';
+import Header from './components/Header';
 import { currentCoinState } from './engine/coinEngine';
 
-// Simple chart using SVG
-function MiniChart({ history }) {
-  if (!history.length) return null;
-  const prices = history.map(h => h.price);
+// Mini SVG line chart for per-token page
+function LineChart({ data }) {
+  if (!data.length) return null;
+  const prices = data.map(d => d.price);
   const min = Math.min(...prices);
   const max = Math.max(...prices);
-  const width = 300;
-  const height = 80;
-  const points = history.map((h, i) => {
-    const x = (i / (history.length - 1)) * width;
-    const y = height - ((h.price - min) / (max - min + 0.000001)) * height;
+  const width = 500;
+  const height = 200;
+  const points = data.map((d, i) => {
+    const x = (i / (data.length - 1)) * width;
+    const y = height - ((d.price - min) / (max - min + 0.000001)) * height;
     return `${x},${y}`;
   }).join(' ');
   return (
     <svg width={width} height={height}>
-      <polyline fill="none" stroke="#8B5CF6" strokeWidth="2" points={points} />
+      <polyline
+        fill="none"
+        stroke="#4F88FF"
+        strokeWidth="2"
+        points={points}
+      />
     </svg>
   );
 }
@@ -29,12 +30,12 @@ function MiniChart({ history }) {
 export default function App() {
   const [now, setNow] = useState(Math.floor(Date.now() / 1000));
   const [balance, setBalance] = useState(() => {
-    const stored = localStorage.getItem('md_balance_v2');
+    const stored = localStorage.getItem('md_balance_pro');
     return stored ? Number(stored) : 10000;
   });
   const [portfolio, setPortfolio] = useState(() => {
     try {
-      const stored = localStorage.getItem('md_portfolio_v2');
+      const stored = localStorage.getItem('md_portfolio_pro');
       return stored ? JSON.parse(stored) : {};
     } catch {
       return {};
@@ -47,8 +48,8 @@ export default function App() {
     return () => clearInterval(id);
   }, []);
 
-  useEffect(() => localStorage.setItem('md_balance_v2', String(balance)), [balance]);
-  useEffect(() => localStorage.setItem('md_portfolio_v2', JSON.stringify(portfolio)), [portfolio]);
+  useEffect(() => localStorage.setItem('md_balance_pro', String(balance)), [balance]);
+  useEffect(() => localStorage.setItem('md_portfolio_pro', JSON.stringify(portfolio)), [portfolio]);
 
   // Coins list
   const visibleSeconds = 1800;
@@ -63,23 +64,16 @@ export default function App() {
     return arr;
   }, [newestTs, oldestTs]);
 
-  // King of the Hill
-  const kingCoin = useMemo(() => {
-    if (!coins.length) return null;
-    return coins.reduce((a, b) => (b.price > a.price ? b : a));
-  }, [coins]);
-
-  // URL query for token page
+  // URL token param
   const params = new URLSearchParams(window.location.search);
-  const tokenId = params.get('token'); // e.g., ?token=coin-1700000000
+  const tokenId = params.get('token');
 
-  // Trade functions
+  // Buy function
   function buy(coinId, amountUSD) {
     const state = currentCoinState(now, parseInt(coinId.split('-')[1], 10));
-    const price = state.price;
     if (amountUSD > balance) return { success: false, message: 'Insufficient balance' };
     const slippage = Math.min(0.2, 0.005 + 0.5 / Math.sqrt(state.supply));
-    const effectivePrice = price * (1 + slippage * (Math.random() - 0.5));
+    const effectivePrice = state.price * (1 + slippage * (Math.random() - 0.5));
     const qty = amountUSD / effectivePrice;
     setBalance(b => b - amountUSD);
     setPortfolio(p => {
@@ -95,6 +89,7 @@ export default function App() {
     return { success: true, qty, price: effectivePrice };
   }
 
+  // Sell function
   function sell(coinId, qtyToSell) {
     const state = currentCoinState(now, parseInt(coinId.split('-')[1], 10));
     const holding = portfolio[coinId];
@@ -113,7 +108,7 @@ export default function App() {
     return { success: true, proceeds, price: effectivePrice };
   }
 
-  // Per-token page view
+  // Per-token page
   if (tokenId) {
     const state = currentCoinState(now, parseInt(tokenId.split('-')[1], 10));
     const history = [];
@@ -122,49 +117,78 @@ export default function App() {
       history.push({ ts: t, price: s.price });
     }
     return (
-      <div className="min-h-screen p-6 bg-[#071032] text-white">
-        <a href="/" className="text-sm text-white/60 mb-4 inline-block">← Back to Market</a>
-        <div className="flex items-center gap-4 mb-6">
-          <div className="text-5xl">{state.meta.emoji}</div>
-          <div>
-            <div className="text-2xl font-bold">{state.meta.name} ({state.meta.symbol})</div>
-            <div className="text-sm text-white/60">Supply: {state.meta.supply.toLocaleString()}</div>
+      <div className="min-h-screen p-6 bg-[#0B0E1A] text-[#E6E8F0] font-sans">
+        <a href="/" className="text-sm text-[#A0A3B0] mb-4 inline-block">← Back to Market</a>
+        <div className="mb-6 flex flex-col md:flex-row gap-6">
+          <div className="flex-1">
+            <div className="text-3xl font-semibold mb-2">{state.meta.name} ({state.meta.symbol})</div>
+            <div className="text-sm text-[#A0A3B0] mb-2">Supply: {state.meta.supply.toLocaleString()}</div>
             <div className="text-xs text-red-400">{state.meta.isRug ? '⚠️ Rug pull risk' : state.meta.isDump ? '🔻 Dump risk' : ''}</div>
+            <div className="text-2xl font-mono mt-4">${state.price.toFixed(6)}</div>
+          </div>
+          <div className="flex-1">
+            <div className="bg-[#1E2235] p-4 rounded-md">
+              <div className="mb-2 font-semibold">Buy / Sell</div>
+              <input type="number" placeholder="USD amount" id="tradeAmount" className="w-full mb-2 p-2 rounded bg-[#0B0E1A] text-[#E6E8F0]" />
+              <div className="flex gap-2">
+                <button
+                  className="flex-1 p-2 rounded bg-[#4F88FF] hover:bg-[#3A6FCC]"
+                  onClick={() => {
+                    const amt = Number(document.getElementById('tradeAmount').value);
+                    buy(tokenId, amt);
+                  }}
+                >
+                  Buy
+                </button>
+                <button
+                  className="flex-1 p-2 rounded bg-[#FF4F4F] hover:bg-[#CC3A3A]"
+                  onClick={() => {
+                    const amt = Number(document.getElementById('tradeAmount').value);
+                    const qty = amt / state.price;
+                    sell(tokenId, qty);
+                  }}
+                >
+                  Sell
+                </button>
+              </div>
+            </div>
           </div>
         </div>
-        <div className="mb-6 w-full h-32 bg-white/5 rounded-lg p-2">
-          <MiniChart history={history} />
+        <div className="bg-[#1E2235] p-4 rounded-md">
+          <LineChart data={history} />
         </div>
-        <TradeModal coin={{ ...state.meta, price: state.price, id: tokenId }} buy={buy} sell={sell} portfolio={portfolio} now={now} onClose={() => {}} />
       </div>
     );
   }
 
-  // Home page
+  // Homepage
   return (
-    <div className="min-h-screen p-6 bg-gradient-to-b from-[#071032] to-[#031428] text-white font-sans">
+    <div className="min-h-screen p-6 bg-[#0B0E1A] text-[#E6E8F0] font-sans">
       <Header route="/market" setRoute={() => {}} balance={balance} />
-      {kingCoin && (
-        <div className="p-4 rounded-lg bg-gradient-to-r from-yellow-400 to-red-500 text-black font-bold mb-4">
-          👑 King of the Hill: {kingCoin.name} (${kingCoin.price.toFixed(6)})
-        </div>
-      )}
-      <div className="space-y-3">
-        {coins.map(c => (
-          <div key={c.id} className="relative">
-            <a href={`/?token=${c.id}`}>
-              <CoinCard coin={c} onTrade={coin => setSelectedCoin(coin)} />
-            </a>
-            {/* optional background image for coins */}
-            <div className="absolute inset-0 opacity-10 z-0">
-              <span className="text-9xl flex justify-center items-center w-full h-full">{c.emoji}</span>
-            </div>
-          </div>
-        ))}
-      </div>
-      {selectedCoin && (
-        <TradeModal coin={selectedCoin} now={now} currentCoinState={currentCoinState} portfolio={portfolio} buy={buy} sell={sell} onClose={() => setSelectedCoin(null)} />
-      )}
+      <table className="w-full mt-6 text-left border-collapse">
+        <thead>
+          <tr className="text-[#A0A3B0] border-b border-[#1E2235]">
+            <th className="py-2 px-4">Name</th>
+            <th className="py-2 px-4">Symbol</th>
+            <th className="py-2 px-4">Price</th>
+            <th className="py-2 px-4">Supply</th>
+            <th className="py-2 px-4">Age (s)</th>
+            <th className="py-2 px-4">Risk</th>
+          </tr>
+        </thead>
+        <tbody>
+          {coins.map(c => (
+            <tr key={c.id} className="hover:bg-[#1E2235] cursor-pointer">
+              <td className="py-2 px-4"><a href={`/?token=${c.id}`} className="hover:underline">{c.name}</a></td>
+              <td className="py-2 px-4">{c.symbol}</td>
+              <td className="py-2 px-4 font-mono">${c.price.toFixed(6)}</td>
+              <td className="py-2 px-4">{c.supply.toLocaleString()}</td>
+              <td className="py-2 px-4">{c.age}</td>
+              <td className="py-2 px-4">{c.isRug ? '⚠️ Rug' : c.isDump ? '🔻 Dump' : '—'}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
